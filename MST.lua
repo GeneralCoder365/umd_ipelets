@@ -139,8 +139,6 @@ function minimumFunkDistance(model, shape_vertices, B, C)
     local forwardFunkDist = forwardFunkDistance(model, shape_vertices, B, C)
     local reverseFunkDist = reverseFunkDistance(model, shape_vertices, B, C)
 
-    -- print forward and reverse funk distances
-
     return math.min(forwardFunkDist, reverseFunkDist)
 end
 
