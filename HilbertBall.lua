@@ -1,42 +1,33 @@
 -- Define the Ipelet
 label = "Hilbert Ball"
+revertOriginal = _G.revertOriginal
 about = "Given a polygon, and its center point, returns the Hilbert ball of the polygon"
 
---[=[
-Given:
- - path obj
- - () -> Path
-Return:
- - table of segments
- - () -> {Segment}
---]=]
-function get_polygon_segments(obj, model)
+function incorrect(title, model) model:warning(title) end
 
-	local shape = obj:shape()
-
-	local segment_matrix = shape[1]
-
-	local segments = {}
-	local segments_start_finish = {}
-	for _, segment in ipairs(segment_matrix) do
-		table.insert(segments, ipe.Segment(segment[1], segment[2]))
-		table.insert( segments_start_finish, {segment[1], segment[2]} )
-	end
-	 
-	table.insert(
-		segments,
-		ipe.Segment(segment_matrix[#segment_matrix][2], segment_matrix[1][1])
-	)
-	table.insert( segments_start_finish, {segment_matrix[#segment_matrix][2], segment_matrix[1][1]} )
-
-	return segments, segments_start_finish
+function is_convex(vertices)
+	local _, convex_hull_vectors = convex_hull(vertices)
+	return #convex_hull_vectors == #vertices
 end
---[=[
-Given:
- - path obj: () -> Path
-Return:
- - table of vertices: () -> {Vector}
---]=]
+
+function is_in_polygon(point, polygon)
+    local x, y = point.x, point.y
+    local j = #polygon
+    local inside = false
+
+    for i = 1, #polygon do
+        local xi, yi = polygon[i].x, polygon[i].y
+        local xj, yj = polygon[j].x, polygon[j].y
+
+        if ((yi > y) ~= (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi) then
+            inside = not inside
+        end
+        j = i
+    end
+
+    return inside
+end
+
 function get_polygon_vertices(obj, model)
 
 	local shape = obj:shape()
@@ -54,35 +45,49 @@ function get_polygon_vertices(obj, model)
 
 	return vertices
 end
---[=[
-Given:
- - path obj
- - () -> Path
-Return:
- - table of vertices
- - table of segments
- - () -> {Vector}
- - () -> {Segment}
---]=]
-function get_polygon_vertices_and_segments(obj, model)
-	local segments, segments_start_finish = get_polygon_segments(obj)
-	return get_polygon_vertices(obj), segments, segments_start_finish
+
+function create_segments_from_vertices(vertices)
+	local segments = {}
+	local segments_start_finish = {}
+	for i=1, #vertices-1 do
+		table.insert( segments, ipe.Segment(vertices[i], vertices[i+1]) )
+		table.insert( segments_start_finish, {vertices[i],vertices[i+1]} )
+	end
+
+	table.insert( segments, ipe.Segment(vertices[#vertices], vertices[1]) )
+	table.insert( segments_start_finish, {vertices[#vertices], vertices[1]} )
+	return segments, segments_start_finish
 end
---[=[
-Given:
- - model
-Return:
- - point: () -> Vector
- - vertices: () -> {Vector}
- - segments: () -> {Segment}
---]=]
+
+function unique_points(points, model)
+	-- Check for duplicate points and remove them
+    local uniquePoints = {}
+    for i = 1, #points do
+        if (not_in_table(uniquePoints, points[i])) then
+					table.insert(uniquePoints, points[i])
+				end
+    end
+    return uniquePoints
+end
+
+function get_polygon_vertices_and_segments(obj, model)
+	local vertices = get_polygon_vertices(obj)
+	vertices = unique_points(vertices)
+	local segments, segments_start_finish = create_segments_from_vertices(vertices)
+	return vertices, segments, segments_start_finish
+end
+
+function copy_table(orig_table)
+	local new_table = {}
+	for i=1, #orig_table do new_table[i] = orig_table[i] end
+	return new_table
+end
+
 function get_pt_and_polygon_selection(model)
 
 	local p = model:page()
-	if not p:hasSelection() then
-	model.ui:explain("noselection") -- explain and quit if no selection
-	return
-	end
+
+	if not p:hasSelection() then incorrect("Please select a convex polygon and a point", model) return end
 
 	local referenceObject
 	local pathObject
@@ -96,62 +101,32 @@ function get_pt_and_polygon_selection(model)
 		end
 	end
 
-	if count ~= 2 then
-		model.ui:explain("Please select a point and polygon")
-		return
-	end
+	if not referenceObject or not pathObject then incorrect("Please select a convex polygon and a point", model) return end
 
-	local point = referenceObject:position()  -- retrieve the point position (Vector)
+	local point = referenceObject:matrix() * referenceObject:position()
 	local vertices, segments, segments_start_finish = get_polygon_vertices_and_segments(pathObject, model)
+
+	local poly1_convex = is_convex(copy_table(vertices))
+	if poly1_convex == false then incorrect("Polygon must be convex", model) return end
+	if not is_in_polygon(point, copy_table(vertices)) then incorrect("Point must be inside the polygon", model) return end
 
 	return point, vertices, segments, segments_start_finish
 end
 
-
---[=[
-Given:
- - a vertex v = Vector(a,b)
- - a center point c = Vector(c,d)
-Return:
- - a line going through c and v
- - () -> Line
---]=]
 function create_ray(v,c, model)
 	return ipe.LineThrough(v, c)
 end
 
---[=[
-Given:
- - ordered table of vertices {v1, v2, ... vn}: () -> {Vector}
- - center c: () -> Vector
-Return:
- - table of tables of (vertex, ray): () -> {{Vector, Line}}
---]=]
 function create_rays(v, c, model)
 	local rays = {}
 	for i=1, #v do table.insert( rays, { v[i],  create_ray(v[i], c, model) } ) end
 	return rays
 end
 
---[=[
-Given:
- - ray r
- - segment s
-Return:
- - r:intersects(s)
- - type() -> Vector
---]=]
 function intersect(s,r)
 	return r:intersects(s)
 end
---[=[
-Given:
- - table of rays with associated vertex: () -> {{Vector, Line}}
- - segments of polygon: () -> {Segment}
-Return:
- - table of segments: () -> {Segment}
- - Segment: (start: vertex, finish: intersection point on edge) 
---]=]
+
 function equal(v1,v2)
 	if v1.x == v2.x and v1.y == v2.y then
 		return true
@@ -159,13 +134,13 @@ function equal(v1,v2)
 		return false
 	end
 end
+
 function get_spokes(rays, segments, model)
 
   local spokes = {}
   local vertex_intersect = {}
   for j=1, #segments do
   	for i=1, #rays do
-		-- local line = ipe.LineThrough(segments[j][1],segments[j][2])
 		if not equal(segments[j][1], rays[i][1]) and not equal(segments[j][2], rays[i][1]) then
 			local intersection = ipe.Segment(segments[j][1],segments[j][2]):intersects(rays[i][2])
 			if intersection ~= nil then
@@ -175,13 +150,9 @@ function get_spokes(rays, segments, model)
 		end
     end
   end
-  model:warning(#vertex_intersect)
   return spokes, vertex_intersect
 end
 
---[=[
-spokes: () -> {Segment for shape}
---]=]
 function get_spokes_path_objs(spokes, model)
     local spoke_obj_list = {}
     for _, spoke in ipairs(spokes) do
@@ -191,8 +162,6 @@ function get_spokes_path_objs(spokes, model)
     end
     return spoke_obj_list
 end
-
--- point between the center and intersection point
 
 function compute_K_constants(a,b,d,R, model)
     local top_fraction = (b.x-d.x)*(b.x-d.x) + (b.y-d.y)*(b.y-d.y)
@@ -243,8 +212,7 @@ function get_point(a,b,d,R, model)
 
 	return ipe.Vector(x_1,y_1), ipe.Vector(x_2, y_2)
 end
-
- -- If D is further to the right, we want to use -B +, -B- 
+ 
 function get_points_on_spokes(vertex_intersect, center, radius, polygon, model)
 	
     local points_on_spokes = {}
@@ -280,8 +248,6 @@ function get_points_on_spokes(vertex_intersect, center, radius, polygon, model)
     return points_on_spokes
 end
 
-
-
 function create_shape_from_vertices(v, model)
 	local shape = {type="curve", closed=true;}
 	for i=1, #v-1 do
@@ -290,19 +256,12 @@ function create_shape_from_vertices(v, model)
   	table.insert(shape, {type="segment", v[#v], v[1]})
 	return shape
 end
--- val > 0 => CCW
--- val < 0 => CW
--- val == 0 => collinear
+
 function orient(p, q, r)
     val = p.x * (q.y - r.y) + q.x * (r.y - p.y) + r.x * (p.y - q.y)
     return val
 end
---[=[
-Given:
- - vertices: () -> {Vector}
-Return:
- - shape of the convex hull of points: () -> Shape
---]=]
+
 function convex_hull(points, model)
 
 	function sortByX(a,b) return a.x < b.x end
@@ -335,19 +294,37 @@ function convex_hull(points, model)
 	for i=1, #lower do table.insert(S, lower[i]) end
 	for i=1, #upper do table.insert(S, upper[i]) end
 
-	return create_shape_from_vertices(S)
+	return create_shape_from_vertices(S), S
 
 end
---! Run the Ipelet
-function run(model)
+
+function run_spokes(model)
+	if not get_pt_and_polygon_selection(model) then return end
     local center, vertices, _, segments_start_finish = get_pt_and_polygon_selection(model)
     local v_rays = create_rays(vertices, center, model)
     local spokes, vertex_intersect = get_spokes(v_rays, segments_start_finish, model)
 	
     local spoke_obj_list = get_spokes_path_objs(spokes, model)
     local points_on_spokes = get_points_on_spokes(vertex_intersect, center, 1, vertices, model)
-    table.insert(spoke_obj_list, ipe.Path(model.attributes, { convex_hull(points_on_spokes) }))
-
+	local shape, _ = convex_hull(points_on_spokes)
+    table.insert(spoke_obj_list, ipe.Path(model.attributes, { shape }))
 
     model:creation("points on spokes", ipe.Group(spoke_obj_list) )
 end
+
+function run_without_spokes(model)
+	if not get_pt_and_polygon_selection(model) then return end
+    local center, vertices, _, segments_start_finish = get_pt_and_polygon_selection(model)
+    local v_rays = create_rays(vertices, center, model)
+    local _, vertex_intersect = get_spokes(v_rays, segments_start_finish, model)
+	
+    local points_on_spokes = get_points_on_spokes(vertex_intersect, center, 1, vertices, model)
+	local shape, _ = convex_hull(points_on_spokes)
+
+    model:creation("points on spokes", ipe.Path(model.attributes, { shape }) )
+end
+
+methods = {
+	{ label="With Spokes", run = run_spokes },
+	{ label="Without Spokes", run = run_without_spokes },
+  }
