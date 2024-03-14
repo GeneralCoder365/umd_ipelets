@@ -1,163 +1,173 @@
 -- Ipelet: Minkowski Sum
--- Template: https://cp-algorithms.com/geometry/minkowski.html#algorithm
 
 -- Define the Ipelet
 label = "Minkowski Sum"
 about = "Computes the Minkowski Sum of two convex polygons in R^2"
 
---! PRINT FUNCTIONS
-function print_vertices(vertices, title, model)
-    local msg = title ..  ": "
-    for _, vertex in ipairs(vertices) do
-        msg = msg .. ": " .. string.format("Vertex: (%f, %f), ", vertex.x, vertex.y)
-    end
-    model:warning(msg)
-end
-
-function print_vertex(v, title, model)
-    local msg = title
-    msg = msg .. ": " .. string.format("(%f, %f), ", v.x, v.y)
-    model:warning(msg)
-end
-
-function print(x, title, model)
-    local msg = title .. ": " .. x
-    model:warning(msg)
-end
-
-
---! BASIC OPERATIONS
--- Add points: P + Q = (P.x + Q.x, P.y + Q.y)
-function add(p1, p2)
-    return ipe.Vector(p1.x + p2.x, p1.y + p2.y)
-end
-
--- Subtract points: P - Q = (P.x - Q.x, P.y - Q.y)
-function subtract(p1, p2)
-    return ipe.Vector(p1.x - p2.x, p1.y - p2.y)
-end
-
--- 2D cross product: P x Q = P.x*Q.y - P.y*Q.x
--- Used to determine the orientation of three points (counterclockwise, collinear, clockwise)
-function cross(p1, p2)
-    return p1.x * p2.y - p1.y * p2.x
-end
-
+function incorrect(title, model) model:warning(title) end
 
 --! MINKOWSKI SUM
--- Reorder polygon vertices
--- Ensures the first vertex has the smallest y-coordinate (and x in case of tie)
--- Aids in consistently starting the Minkowski sum from a specific vertex
-function reorder_polygon(P, model)
-    local pos = 1
-    for i = 2, #P do
-        if P[i].y < P[pos].y or (P[i].y == P[pos].y and P[i].x < P[pos].x) then
-            pos = i
-        end
-    end
-    local reordered = {}
-    for i = pos, #P do
-        table.insert(reordered, P[i])
-    end
-    for i = 1, pos-1 do
-        table.insert(reordered, P[i])
-    end
-    return reordered
-end
-
 -- Compute the Minkowski Sum
 -- Uses the oriented cross product to ensure convexity and consistent vertex ordering
 function minkowski(P, Q, model)
-    -- Reorder vertices to have a consistent starting point
-    local P = reorder_polygon(P, model)
-    local Q = reorder_polygon(Q, model)
-
-    -- Ensure cyclic indexing by adding the first two points at the end
-    table.insert(P, P[1])
-    table.insert(P, P[2])
-    table.insert(Q, Q[1])
-    table.insert(Q, Q[2])
-    
 
     local result = {}
-    local i, j = 1, 1
 
-    -- Iterate over P and Q vertices, adding corresponding points and determining which polygon’s vertex to move to next
-    while i < #P-1 or j < #Q-1 do
-        table.insert(result, add(P[i],Q[j])) -- Add vertices P[i], Q[j] and insert into result
-        local cross = cross(subtract(P[i + 1], P[i]), subtract(Q[j + 1], Q[j])) -- Compute cross product of vectors P[i+1]P[i], Q[j+1]Q[j]
-
-        -- Determine which vertex to move to next based on the cross product sign
-        if cross >= 0 and i < #P-1 then -- Ensures we always have 2 elems to work with, if at length - 2, then stay at same index
-            i = i + 1
+    for i=1, #P do
+        for j=1, #Q do
+            table.insert(result, P[i] + Q[j])
         end
-        if cross <= 0 and j < #Q-1 then -- Ensures we always have 2 elems to work with, if at length - 2, then stay at same index
-            j = j + 1
-        end
-
-        --? NOTE: When cross == 0,
-        --? it indicates that the two vectors, which are edges from the polygons P and Q, are parallel.
-        --? If both i and j are incremented, it means that the algorithm is considering the next vertex from both polygons 
-            --? P and Q for the resultant Minkowski sum.
-        --? This might be appropriate in some cases, especially when the parallel edges from P and Q
-                                                    --? are part of the boundary of the Minkowski sum.
     end
+
     return result
 end
 
-
---! IPELET FUNCTIONS
--- GET SELECTION DATA
-function incorrect(model)
-    model:warning("One or more selections are not polygons")
-end
-function get_selection_data(model)
-    local page = model:page()
-    local polygons = {}
-
-    for i = 1, #page do
-        local obj = page[i]
-        if page:select(i) then
-            if obj:type() ~= "path" then incorrect(model) return end
-            table.insert(polygons, obj)
-        end
-    end
-
-    if #polygons ~= 2 then
-        model:warning("Please select 2 polygons")
-    end
-
-    return polygons[1], polygons[2]
-end
-
--- COLLECT VERTICES
-function not_in_table(vertices, vertex_comp)
-    local flag = true
-    for _, vertex in ipairs(vertices) do
-        if vertex == vertex_comp then
-            flag = false
-        end
-    end
-    return flag
-end
-function collect_vertices(obj)
-    local vertices = {}
+function get_polygon_vertices(obj, model)
 
     local shape = obj:shape()
-    local m = obj:matrix()
+    local polygon = obj:matrix()
 
-    for _, subpath in ipairs(shape) do
-        for _, segment in ipairs(subpath) do
-            if not_in_table(vertices, segment[1]) then
-                table.insert(vertices, segment[1])
-            end
-            if not_in_table(vertices, segment[2]) then
-                table.insert(vertices, segment[2])
-            end
-        end
+    vertices = {}
+
+        -- Apply transformation to the first vertex to handle translation
+    vertex = polygon * shape[1][1][1]
+    table.insert(vertices, vertex)
+
+        -- Apply transformation to the rest of the vertices to handle translation
+    for i=1, #shape[1] do
+        vertex = polygon * shape[1][i][2]
+        table.insert(vertices, vertex)
     end
 
     return vertices
+end
+
+function is_convex(vertices)
+    local _, convex_hull_vectors = convex_hull(vertices)
+    return #convex_hull_vectors == #vertices
+end
+
+function copy_table(orig_table)
+    local new_table = {}
+    for i=1, #orig_table do new_table[i] = orig_table[i] end
+    return new_table
+end
+
+function startBottomLeft(vertices)
+    local minimum = 1
+    for k=1, #vertices do
+        local current = vertices[k]
+        local min = vertices[minimum]
+        if current.y < min.y then
+            minimum=k
+        elseif current.y == min.y then
+            if current.x < min.x then
+                minimum=k
+            end
+        end
+    end
+
+    local new_vertices = {}
+    for i=0, #vertices do
+        new_vertices[i] = vertices[(i-1+minimum) % #vertices+1]
+    end
+
+    return new_vertices
+end
+
+
+
+function get_two_polygons_selection(model)
+    local p = model:page()
+    
+    if not p:hasSelection() then incorrect("Please select 2 convex polygons", model) return end
+
+    local pathObject1
+    local pathObject2
+    local count = 0
+    local flag = true
+
+    for _, obj, sel, _ in p:objects() do
+        if sel then
+            count = count + 1
+            if obj:type() == "path" and flag then
+                pathObject1 = obj
+                flag = not flag
+            else
+                if obj:type() == "path" then pathObject2 = obj end
+            end
+        end
+    end
+
+    if not pathObject1 or not pathObject2 then incorrect("Please select 2 convex polygons", model) return end
+
+    local vertices1 = get_polygon_vertices(pathObject1, model)
+    local vertices2 = get_polygon_vertices(pathObject2, model)
+
+    local vertices1 = startBottomLeft(make_clockwise(unique_points(vertices1)))
+    local vertices2 = startBottomLeft(make_clockwise(unique_points(vertices2)))
+
+    local poly1_convex = is_convex(copy_table(vertices1))
+    local poly2_convex = is_convex(copy_table(vertices2))
+    if poly1_convex == false or poly2_convex == false then incorrect("Polygons must be convex", model) return end
+    return vertices1, vertices2
+end
+
+
+-- CONVEX HULL
+--[=[
+Given:
+ - vertices: () -> {Vector}
+Return:
+ - shape of the convex hull of points: () -> Shape
+--]=]
+function convex_hull(points, model)
+
+    function orient(p, q, r) return p.x * (q.y - r.y) + q.x * (r.y - p.y) + r.x * (p.y - q.y) end
+    function sortByX(a,b) return a.x < b.x end
+
+    table.sort(points, sortByX)
+
+    local upper = {}
+    table.insert(upper, points[1])
+    table.insert(upper, points[2])
+    for i=3, #points do
+        while #upper >= 2 and orient(points[i], upper[#upper], upper[#upper-1]) <= 0 do
+            table.remove(upper, #upper)
+        end
+        table.insert(upper, points[i])
+    end
+
+  local lower = {}
+    table.insert(lower, points[#points])
+    table.insert(lower, points[#points-1])
+    for i = #points-2, 1, -1 do
+        while #lower >= 2 and orient(points[i], lower[#lower], lower[#lower-1]) <= 0 do
+            table.remove(lower, #lower)
+        end
+        table.insert(lower, points[i])
+    end
+
+    table.remove(upper, 1)
+    table.remove(upper, #upper)
+
+    local S = {}
+    for i=1, #lower do table.insert(S, lower[i]) end
+    for i=1, #upper do table.insert(S, upper[i]) end
+
+    return create_shape_from_vertices(S), S
+
+end
+
+
+-- SHAPE CREATION
+function create_shape_from_vertices(v, model)
+    local shape = {type="curve", closed=true;}
+    for i=1, #v-1 do 
+        table.insert(shape, {type="segment", v[i], v[i+1]})
+    end
+    table.insert(shape, {type="segment", v[#v], v[1]})
+    return shape
 end
 
 -- Creates segments from vertex pairs
@@ -178,10 +188,10 @@ function calculate_centroid(vertices)
 end
 
 -- Function to shift the vertices of a polygon by a given vector
-function shift_polygon(vertices, shift_vector)
+function shift_polygon(vertices, shift_vector, model)
     local shifted_vertices = {}
     for _, v in ipairs(vertices) do
-        table.insert(shifted_vertices, ipe.Vector(v.x + shift_vector.x, v.y + shift_vector.y))
+        table.insert(shifted_vertices, v + shift_vector)
     end
     return shifted_vertices
 end
@@ -197,49 +207,80 @@ function center_minkowski_sum(primary, secondary, minkowski_result, model)
                                 (centroid_primary.y + centroid_secondary.y) / 2)
 
     -- Calculate the vector required to shift the Minkowski sum's centroid to the midpoint
-    local shift_vector = ipe.Vector(midpoint.x - centroid_minkowski.x, 
-                                    midpoint.y - centroid_minkowski.y)
+    -- local shift_vector = ipe.Vector(midpoint.x - centroid_minkowski.x, 
+    --                                 midpoint.y - centroid_minkowski.y)
+    local shift_vector = midpoint - centroid_minkowski
 
     -- Shift the Minkowski sum to be centered around the midpoint
-    return shift_polygon(minkowski_result, shift_vector)
+    return shift_polygon(minkowski_result, shift_vector, model)
+end
+
+function not_in_table(vectors, vector_comp)
+    local flag = true
+    for _, vertex in ipairs(vectors) do
+        if vertex == vector_comp then
+            flag = false
+        end
+    end
+    return flag
+end
+
+function unique_points(points, model)
+    -- Check for duplicate points and remove them
+    local uniquePoints = {}
+    for i = 1, #points do
+        if not_in_table(uniquePoints, points[i]) then table.insert(uniquePoints, points[i]) end
+    end
+    return uniquePoints
+end
+
+function orientation(point_a, point_b, point_c, model)
+    local val = (point_b.y - point_a.y) * (point_c.x - point_b.x) - (point_b.x - point_a.x) * (point_c.y - point_b.y)
+    if (val > 0) then
+        return 1
+    elseif (val < 0) then
+        return 2
+    else
+        return 0
+    end
+end
+
+function make_clockwise(poly1, model)
+    local reference = poly1[1]
+    local should_reverse = false
+    if orientation(poly1[1], poly1[2], poly1[3]) == 2 then
+        should_reverse = true
+    end
+    if should_reverse then
+        local i = 1
+        local j = #poly1
+        while i < j do
+            local temp = poly1[i]
+            poly1[i] = poly1[j]
+            poly1[j] = temp
+            i = i + 1
+            j = j - 1
+        end
+    end
+    return poly1
 end
 
 --! Run the Ipelet
 function run(model)
-    -- Obtain the first page of the Ipe document.
-    local page = model:page()
-    
-    -- Get info for the two objects
-    local obj1, obj2 = get_selection_data(model)
-    local primary = collect_vertices(obj1)
-    local secondary = collect_vertices(obj2)
-    
-    -- Testing
-    -- print_vertices(primary, 1, model)
-    -- print_vertices(secondary, 2, model)
+
+    if not get_two_polygons_selection(model) then return end
+    local primary, secondary = get_two_polygons_selection(model)
     
     --! Compute the Minkowski sum of the two polygons and store resulting vertices
     local result_vertices = minkowski(primary, secondary, model)
-    -- print_vertices(result_vertices, "Original Result Vertices", model)
+
+    local result_shape_obj, s = convex_hull(result_vertices)
+
     --! Center the Minkowski sum around the two input shapes
-    local centered_result_vertices = center_minkowski_sum(primary, secondary, result_vertices, model)
-    -- print_vertices(centered_result_vertices, "Centered Result Vertices", model)
+    local centered_result_vertices = center_minkowski_sum(primary, secondary, s, model)
 
-    --! Convert to a shape
-    -- Original
-    local result_shape = {type="curve", closed=true;}
-    for i=1, #result_vertices-1 do -- Add each vertex pair --> segment to the shape
-        table.insert(result_shape, segmentation(result_vertices[i], result_vertices[i + 1]))
-    end
-    -- Centered
-    local centered_result_shape = {type="curve", closed=true;}
-    for i=1, #centered_result_vertices-1 do -- Add each vertex pair --> segment to the shape
-        table.insert(centered_result_shape, segmentation(centered_result_vertices[i], centered_result_vertices[i + 1]))
-    end
+    local centered_shape_obj, _ = convex_hull(centered_result_vertices)
 
-    local result_obj = ipe.Path(model.attributes, {result_shape}) -- Generate the original result shape
-    local centered_result_obj = ipe.Path(model.attributes, {centered_result_shape}) -- Generate the centered result shape
-
-    model:creation("Create Minkowski Sum", result_obj)
-    model:creation("Create Centered Minkowski Sum", centered_result_obj)
+    -- model:creation("Create Minkowski Sum", ipe.Path(model.attributes, { result_shape_obj }))
+    model:creation("Create Centered Minkowski Sum", ipe.Path(model.attributes, { centered_shape_obj }))
 end
