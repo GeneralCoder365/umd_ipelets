@@ -1,59 +1,42 @@
 ----------------------------------------------------------------------
--- Macbeath region auto-generation for arbitray polygon
+-- Macbeath region auto-generation for arbitrary polygon
 ----------------------------------------------------------------------
-label = "MacbeathRegion"
+label = "Macbeath Region"
 revertOriginal = _G.revertOriginal
 about = [[
-Generate macbeth region for a polygon, best used with shortcuts.
+Generate macbeath region for a polygon, best used with shortcuts.
 This Lua ipelet script is written by Hongyang Du hongyangdu182@gmail.com.
 ]]
 shortcuts.ipelet_macbeth_region = "Ctrl+M" -- Assigning a shortcut (Ctrl+M) for the ipelet_macbeth_region
 
-
---[=[
-Given:
- - path obj
- - () -> Path
-Return:
- - table of segments
- - () -> {Segment}
---]=]
 function get_polygon_segments(obj, model)
 
 	local shape = obj:shape()
+	local translation = obj:matrix():translation()
 
 	local segment_matrix = shape[1]
 
 	local segments = {}
 	for _, segment in ipairs(segment_matrix) do
-		table.insert(segments, ipe.Segment(segment[1], segment[2]))
+		table.insert(segments, ipe.Segment(segment[1]+translation, segment[2]+translation))
 	end
 	 
 	table.insert(
 		segments,
-		ipe.Segment(segment_matrix[#segment_matrix][2], segment_matrix[1][1])
+		ipe.Segment(segment_matrix[#segment_matrix][2]+translation, segment_matrix[1][1]+translation)
 	)
 
 	return segments
 end
 
---[=[
-Given:
- - path obj
- - () -> Path
-Return:
- - table of vertices
- - table of segments
- - () -> {Vector}
- - () -> {Segment}
---]=]
-function get_polygon_vertices_and_segments(obj, model)
+function get_polygon_vertices(obj, model)
 
 	local shape = obj:shape()
 	local polygon = obj:matrix()
 
-	local vertices = {}
-	local vertex = polygon * shape[1][1][1]
+	vertices = {}
+
+	vertex = polygon * shape[1][1][1]
 	table.insert(vertices, vertex)
 
 	for i=1, #shape[1] do
@@ -61,17 +44,23 @@ function get_polygon_vertices_and_segments(obj, model)
 		table.insert(vertices, vertex)
 	end
 
-	local segment_matrix = shape[1]
-	local segments = {}
-	for i, segment in ipairs(segment_matrix) do 
-		table.insert(segments, ipe.Segment(segment[1], segment[2]))
-	end
-	 
-	table.insert(
-		segments, 
-		ipe.Segment(segment_matrix[#segment_matrix][2], segment_matrix[1][1])
-	)
+	return vertices
+end
 
+function create_segments_from_vertices(vertices)
+	local segments = {}
+	for i=1, #vertices-1 do
+		table.insert( segments, ipe.Segment(vertices[i], vertices[i+1]) )
+	end
+
+	table.insert( segments, ipe.Segment(vertices[#vertices], vertices[1]) )
+	return segments
+end
+
+function get_polygon_vertices_and_segments(obj, model)
+	local vertices = get_polygon_vertices(obj)
+	vertices = unique_points(vertices)
+	local segments = create_segments_from_vertices(vertices)
 	return vertices, segments
 end
 
@@ -87,13 +76,6 @@ function macbeath_vertices(orig_vertices, point)
 	return new_vertices
 end
 
---[=[
-Given:
- - vertices, segments of polygon A: () -> {Vector}, () -> {Segment} 
- - vertices, segments of polygon B: () -> {Vector}, () -> {Segment} 
-Return:
- - table of interection points: () -> {Vector}
---]=]
 function get_intersection_points(s1,s2)
 	local intersections = {}
 	for i=1,#s2 do
@@ -108,15 +90,6 @@ function get_intersection_points(s1,s2)
 	return intersections
 end
 
---[=[
-Given:
- - point: () -> Vector
- - vertices of a polygon: () -> {Vector}
-Return:
- - returns true if point is inside the polygon, false otherwise
- - if the point is on the edge of a polygon, then false is returned
- - () -> Bool
---]=]
 function is_in_polygon(point, polygon)
     local x, y = point.x, point.y
     local j = #polygon
@@ -135,14 +108,6 @@ function is_in_polygon(point, polygon)
     return inside
 end
 
---[=[
-Given:
- - vertices of polygon A: () -> {Vector}
- - vertices of polygon B: () -> {Vector}
- - points of A in B
-Return:
- - table of overlapping points: () -> {Vector}
---]=]
 function get_overlapping_points(v1, v2)
 	local overlap = {}
 	for i=1, #v1 do
@@ -199,7 +164,7 @@ function convex_hull(points, model)
 	for i=1, #lower do table.insert(S, lower[i]) end
 	for i=1, #upper do table.insert(S, upper[i]) end
 
-	return create_shape_from_vertices(S)
+	return create_shape_from_vertices(S), S
 
 end
 
@@ -213,23 +178,31 @@ function polygon_intersection(v1, s1, v2, s2, model)
 	for i=1, #overlap1 do table.insert(region, overlap1[i]) end
 	for i=1, #overlap2 do table.insert(region, overlap2[i]) end
 
-	local region_obj = ipe.Path(model.attributes, { convex_hull(region) })
+	local shape, _ = convex_hull(region)
+	local region_obj = ipe.Path(model.attributes, { shape })
 	region_obj:set("pathmode", "strokedfilled")
-	region_obj:set("fill", "red")
+
 	return region_obj
 end
 
-function run(model,num)
-	-- First, we select two objects from the canvas. 
-	-- One is the polygon (Path object) and another one is a point (Reference boject).
+function incorrect(title, model) model:warning(title) end
+
+function is_convex(vertices)
+	local _, convex_hull_vectors = convex_hull(vertices)
+	return #convex_hull_vectors == #vertices
+end
+
+function copy_table(orig_table)
+	local new_table = {}
+	for i=1, #orig_table do new_table[i] = orig_table[i] end
+	return new_table
+end
+
+function get_pt_and_polygon_selection(model)
 
 	local p = model:page()
-	if not p:hasSelection() then
-	model.ui:explain("noselection") -- explain and quit if no selection
-	return
-	end
 
-	-- Now check if a polygon and a point are selected
+	if not p:hasSelection() then incorrect("Please select a convex polygon and a point", model) return end
 
 	local referenceObject
 	local pathObject
@@ -243,20 +216,51 @@ function run(model,num)
 		end
 	end
 
-	if count ~= 2 then
-		model.ui:explain("Please select 2 items") -- explain incorrect selection and quit
-		return
-	end
+	if not referenceObject or not pathObject then incorrect("Please select a convex polygon and a point", model) return end
 
-	local point = referenceObject:position()  -- retrieve the point position (Vector)
-	local original_vertices, segments = get_polygon_vertices_and_segments(pathObject, model)
-	
+	local point = referenceObject:matrix() * referenceObject:position()  -- retrieve the point position (Vector)
+	local vertices, segments = get_polygon_vertices_and_segments(pathObject, model)
+
+	local poly1_convex = is_convex(copy_table(vertices))
+	if poly1_convex == false then incorrect("Polygon must be convex", model) return end
+	if not is_in_polygon(point, copy_table(vertices)) then incorrect("Point must be inside the polygon", model) return end
+
+	return point, vertices, segments
+end
+
+function not_in_table(vectors, vector_comp)
+    local flag = true
+    for _, vertex in ipairs(vectors) do
+        if vertex == vector_comp then
+            flag = false
+        end
+    end
+    return flag
+end
+
+function unique_points(points, model)
+	-- Check for duplicate points and remove them
+    local uniquePoints = {}
+    for i = 1, #points do
+        if (not_in_table(uniquePoints, points[i])) then
+			table.insert(uniquePoints, points[i])
+		end
+    end
+    return uniquePoints
+end
+
+function run(model)
+
+	if not get_pt_and_polygon_selection(model) then return end
+	local point, original_vertices, segments = get_pt_and_polygon_selection(model)
 	local macbeath_vertices = macbeath_vertices(original_vertices, point)
 	local macbeath_shape = create_shape_from_vertices(macbeath_vertices)
 	local macbeath_obj = ipe.Path(model.attributes, { macbeath_shape })
 	local macbeath_segments = get_polygon_segments(macbeath_obj)
 
 	local macbeath_region_obj = polygon_intersection(original_vertices, segments, macbeath_vertices, macbeath_segments, model)
-  	model:creation("Macbeath Region", ipe.Group({macbeath_obj,macbeath_region_obj}))
+	local obj2 =  ipe.Reference(model.attributes,model.attributes.markshape, point)
+
+	model:creation("Macbeath Region", ipe.Group({macbeath_obj,macbeath_region_obj, obj2}))
 
 end
