@@ -2,10 +2,10 @@
 UMD_Ipelets
 
 ## Description
-This is a project to assemble ipelets for many general polygonal operations used by the field of convex geometry.
+This is a project to assemble Ipelets for many general polygonal operations used by the field of convex geometry.
 
 ## Ipelets
-We have several ipelets available for use they are:
+We have several Ipelets available for use they are:
 1. Minkowski Sum
 2. Polar Body
 3. Macbeath Region
