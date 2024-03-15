@@ -2,6 +2,8 @@ label = "PrimModularMST"
 about = "Computes the Minimum Spanning Tree (MST) using Prim's algorithm with modular distance functions on a set of selected points within a shape"
 
 --! PRINT FUNCTIONS
+function incorrect(title, model) model:warning(title) end
+
 function print_vertices(vertices, title, model)
     local msg = title ..  ": "
     for _, vertex in ipairs(vertices) do
@@ -140,6 +142,8 @@ function minimumFunkDistance(model, shape_vertices, B, C)
     local reverseFunkDist = reverseFunkDistance(model, shape_vertices, B, C)
 
     -- print forward and reverse funk distances
+    print(forwardFunkDist, "Forward Funk Distance", model)
+    print(reverseFunkDist, "Reverse Funk Distance", model)
 
     return math.min(forwardFunkDist, reverseFunkDist)
 end
