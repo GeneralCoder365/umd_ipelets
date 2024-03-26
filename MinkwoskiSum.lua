@@ -4,7 +4,37 @@
 label = "Minkowski Sum"
 about = "Computes the Minkowski Sum of two convex polygons in R^2"
 
+
+--! PRINT FUNCTIONS
 function incorrect(title, model) model:warning(title) end
+
+function print_vertices(vertices, title, model)
+    local msg = title ..  ": "
+    for _, vertex in ipairs(vertices) do
+        msg = msg .. ": " .. string.format("Vertex: (%f, %f), ", vertex.x, vertex.y)
+    end
+    model:warning(msg)
+end
+
+function print_table(t, title, model)
+    -- Print lua table
+    local msg = title ..  ": "
+    for k, v in pairs(t) do
+        msg = msg .. k .. " = " .. v .. ", "
+    end
+    model:warning(msg)
+end
+
+function print_vertex(v, title, model)
+    local msg = title
+    msg = msg .. ": " .. string.format("(%f, %f), ", v.x, v.y)
+    model:warning(msg)
+end
+
+function print(x, title, model)
+    local msg = title .. ": " .. x
+    model:warning(msg)
+end
 
 function get_polygon_vertices(obj, model)
 
