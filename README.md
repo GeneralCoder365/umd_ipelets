@@ -3,7 +3,7 @@ UMD_Ipelets
 
 ## Description
 This is a project to assemble Ipelets for many general polygonal operations used by the field of convex geometry.
-To read more please check our [Arxiv Post](https://arxiv.org/abs/2403.10033) and our [video](https://www.youtube.com/watch?v=bWBh-MkIMe4)! 
+To read more please check our [arxiv post](https://arxiv.org/abs/2403.10033) and our [video](https://www.youtube.com/watch?v=bWBh-MkIMe4)! 
 
 ## Ipelets
 We have several Ipelets available for use they are:
