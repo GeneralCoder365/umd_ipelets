@@ -6,31 +6,15 @@ about = "Computes the Minkowski Sum of two convex polygons in R^2"
 
 function incorrect(title, model) model:warning(title) end
 
---! MINKOWSKI SUM
--- Compute the Minkowski Sum
--- Uses the oriented cross product to ensure convexity and consistent vertex ordering
-function minkowski(P, Q, model)
-
-    local result = {}
-
-    for i=1, #P do
-        for j=1, #Q do
-            table.insert(result, P[i] + Q[j])
-        end
-    end
-
-    return result
-end
-
 function get_polygon_vertices(obj, model)
 
     local shape = obj:shape()
     local polygon = obj:matrix()
 
-    vertices = {}
+    local vertices = {}
 
         -- Apply transformation to the first vertex to handle translation
-    vertex = polygon * shape[1][1][1]
+    local vertex = polygon * shape[1][1][1]
     table.insert(vertices, vertex)
 
         -- Apply transformation to the rest of the vertices to handle translation
@@ -52,30 +36,6 @@ function copy_table(orig_table)
     for i=1, #orig_table do new_table[i] = orig_table[i] end
     return new_table
 end
-
-function startBottomLeft(vertices)
-    local minimum = 1
-    for k=1, #vertices do
-        local current = vertices[k]
-        local min = vertices[minimum]
-        if current.y < min.y then
-            minimum=k
-        elseif current.y == min.y then
-            if current.x < min.x then
-                minimum=k
-            end
-        end
-    end
-
-    local new_vertices = {}
-    for i=0, #vertices do
-        new_vertices[i] = vertices[(i-1+minimum) % #vertices+1]
-    end
-
-    return new_vertices
-end
-
-
 
 function get_two_polygons_selection(model)
     local p = model:page()
@@ -101,18 +61,26 @@ function get_two_polygons_selection(model)
 
     if not pathObject1 or not pathObject2 then incorrect("Please select 2 convex polygons", model) return end
 
-    local vertices1 = get_polygon_vertices(pathObject1, model)
-    local vertices2 = get_polygon_vertices(pathObject2, model)
-
-    local vertices1 = startBottomLeft(make_clockwise(unique_points(vertices1)))
-    local vertices2 = startBottomLeft(make_clockwise(unique_points(vertices2)))
+    local vertices1 = unique_points(get_polygon_vertices(pathObject1, model))
+    local vertices2 = unique_points(get_polygon_vertices(pathObject2, model))
 
     local poly1_convex = is_convex(copy_table(vertices1))
     local poly2_convex = is_convex(copy_table(vertices2))
+
     if poly1_convex == false or poly2_convex == false then incorrect("Polygons must be convex", model) return end
     return vertices1, vertices2
 end
 
+--! MINKOWSKI SUM
+-- Compute the Minkowski Sum
+-- Uses the oriented cross product to ensure convexity and consistent vertex ordering
+function minkowski(P, Q, model)
+    local result = {}
+    for i=1, #P do for j=1, #Q do table.insert(result, P[i] + Q[j]) end end
+    return result
+end
+
+function orient(p, q, r) return ((q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y-q.y)) < 0 end
 
 -- CONVEX HULL
 --[=[
@@ -121,42 +89,28 @@ Given:
 Return:
  - shape of the convex hull of points: () -> Shape
 --]=]
-function convex_hull(points, model)
-
-    function orient(p, q, r) return p.x * (q.y - r.y) + q.x * (r.y - p.y) + r.x * (p.y - q.y) end
-    function sortByX(a,b) return a.x < b.x end
-
-    table.sort(points, sortByX)
-
-    local upper = {}
-    table.insert(upper, points[1])
-    table.insert(upper, points[2])
-    for i=3, #points do
-        while #upper >= 2 and orient(points[i], upper[#upper], upper[#upper-1]) <= 0 do
-            table.remove(upper, #upper)
+function convex_hull(points)
+    table.sort(points, function(a,b)
+        if a.x < b.x then
+            return true
+        elseif a.x == b.x then
+            return a.y < b.y
+        else
+            return false
         end
-        table.insert(upper, points[i])
-    end
-
-  local lower = {}
-    table.insert(lower, points[#points])
-    table.insert(lower, points[#points-1])
-    for i = #points-2, 1, -1 do
-        while #lower >= 2 and orient(points[i], lower[#lower], lower[#lower-1]) <= 0 do
-            table.remove(lower, #lower)
+    end)
+    if #points < 3 then return end
+    local hull, left_most, p, q = {}, 1, 1, 0
+    while true do
+        table.insert(hull, points[p])
+        q = (p % #points) + 1
+        for i=1, #points do
+            if orient(points[p], points[i], points[q]) then q = i end
         end
-        table.insert(lower, points[i])
+        p = q
+        if p == left_most then break end
     end
-
-    table.remove(upper, 1)
-    table.remove(upper, #upper)
-
-    local S = {}
-    for i=1, #lower do table.insert(S, lower[i]) end
-    for i=1, #upper do table.insert(S, upper[i]) end
-
-    return create_shape_from_vertices(S), S
-
+    return create_shape_from_vertices(hull), hull
 end
 
 
@@ -169,12 +123,6 @@ function create_shape_from_vertices(v, model)
     table.insert(shape, {type="segment", v[#v], v[1]})
     return shape
 end
-
--- Creates segments from vertex pairs
-function segmentation(v1, v2)
-    return {type="segment", v1, v2}
-end
-
 
 --! CENTERING FUNCTIONS
 -- Function to calculate the centroid of a polygon
@@ -234,53 +182,19 @@ function unique_points(points, model)
     return uniquePoints
 end
 
-function orientation(point_a, point_b, point_c, model)
-    local val = (point_b.y - point_a.y) * (point_c.x - point_b.x) - (point_b.x - point_a.x) * (point_c.y - point_b.y)
-    if (val > 0) then
-        return 1
-    elseif (val < 0) then
-        return 2
-    else
-        return 0
-    end
-end
-
-function make_clockwise(poly1, model)
-    local reference = poly1[1]
-    local should_reverse = false
-    if orientation(poly1[1], poly1[2], poly1[3]) == 2 then
-        should_reverse = true
-    end
-    if should_reverse then
-        local i = 1
-        local j = #poly1
-        while i < j do
-            local temp = poly1[i]
-            poly1[i] = poly1[j]
-            poly1[j] = temp
-            i = i + 1
-            j = j - 1
-        end
-    end
-    return poly1
-end
-
 --! Run the Ipelet
 function run(model)
-
     if not get_two_polygons_selection(model) then return end
     local primary, secondary = get_two_polygons_selection(model)
     
     --! Compute the Minkowski sum of the two polygons and store resulting vertices
     local result_vertices = minkowski(primary, secondary, model)
-
-    local result_shape_obj, s = convex_hull(result_vertices)
+    local centered_result_vertices = center_minkowski_sum(primary, secondary, result_vertices, model)
 
     --! Center the Minkowski sum around the two input shapes
-    local centered_result_vertices = center_minkowski_sum(primary, secondary, s, model)
-
+    local result_shape_obj, _ = convex_hull(result_vertices)
     local centered_shape_obj, _ = convex_hull(centered_result_vertices)
 
-    -- model:creation("Create Minkowski Sum", ipe.Path(model.attributes, { result_shape_obj }))
+    model:creation("Create Minkowski Sum", ipe.Path(model.attributes, { result_shape_obj }))
     model:creation("Create Centered Minkowski Sum", ipe.Path(model.attributes, { centered_shape_obj }))
 end
