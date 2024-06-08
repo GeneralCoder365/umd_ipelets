@@ -5,37 +5,6 @@ label = "Minkowski Sum"
 about = "Computes the Minkowski Sum of two convex polygons in R^2"
 
 
---! PRINT FUNCTIONS
-function incorrect(title, model) model:warning(title) end
-
-function print_vertices(vertices, title, model)
-    local msg = title ..  ": "
-    for _, vertex in ipairs(vertices) do
-        msg = msg .. ": " .. string.format("Vertex: (%f, %f), ", vertex.x, vertex.y)
-    end
-    model:warning(msg)
-end
-
-function print_table(t, title, model)
-    -- Print lua table
-    local msg = title ..  ": "
-    for k, v in pairs(t) do
-        msg = msg .. k .. " = " .. v .. ", "
-    end
-    model:warning(msg)
-end
-
-function print_vertex(v, title, model)
-    local msg = title
-    msg = msg .. ": " .. string.format("(%f, %f), ", v.x, v.y)
-    model:warning(msg)
-end
-
-function print(x, title, model)
-    local msg = title .. ": " .. x
-    model:warning(msg)
-end
-
 function get_polygon_vertices(obj, model)
 
     local shape = obj:shape()
@@ -56,10 +25,37 @@ function get_polygon_vertices(obj, model)
     return vertices
 end
 
-function is_convex(vertices)
-    local _, convex_hull_vectors = convex_hull(vertices)
-    return #convex_hull_vectors == #vertices
+-- function is_convex(vertices, model)
+--     local _, convex_hull_vectors = convex_hull(vertices, model)
+--     return #convex_hull_vectors == #vertices
+-- end
+--! Explanation: O(n)
+-- Iterates over all triplets of vertices in the polygon.
+-- For each triplet, it checks the orientation (clockwise, counterclockwise, or collinear).
+-- If a non-collinear orientation is found, it is compared with the first non-collinear orientation encountered.
+    -- If a mismatch is found (indicating both clockwise and counterclockwise orientations), the polygon is non-convex.
+-- If all non-collinear triplets have the same orientation, the polygon is convex.
+function is_convex(vertices, model)
+    local n = #vertices
+    if n < 3 then return false end -- Less than 3 points can't be a convex polygon
+
+    local firstOrientation = nil
+
+    for i = 1, n do
+        local orientationResult = orientation(vertices[i], vertices[(i % n) + 1], vertices[((i + 1) % n) + 1], model)
+
+        if orientationResult ~= 0 then -- if not collinear
+            if firstOrientation == nil then
+                firstOrientation = orientationResult
+            elseif orientationResult ~= firstOrientation then
+                return false -- Found both clockwise and counterclockwise orientations
+            end
+        end
+    end
+
+    return true -- All non-collinear triplets have the same orientation
 end
+
 
 function copy_table(orig_table)
     local new_table = {}
@@ -94,8 +90,8 @@ function get_two_polygons_selection(model)
     local vertices1 = unique_points(get_polygon_vertices(pathObject1, model))
     local vertices2 = unique_points(get_polygon_vertices(pathObject2, model))
 
-    local poly1_convex = is_convex(copy_table(vertices1))
-    local poly2_convex = is_convex(copy_table(vertices2))
+    local poly1_convex = is_convex(copy_table(vertices1), model)
+    local poly2_convex = is_convex(copy_table(vertices2), model)
 
     if poly1_convex == false or poly2_convex == false then incorrect("Polygons must be convex", model) return end
     return vertices1, vertices2
@@ -110,41 +106,97 @@ function minkowski(P, Q, model)
     return result
 end
 
-function orient(p, q, r) return ((q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y-q.y)) < 0 end
 
--- CONVEX HULL
---[=[
-Given:
- - vertices: () -> {Vector}
-Return:
- - shape of the convex hull of points: () -> Shape
---]=]
-function convex_hull(points)
-    table.sort(points, function(a,b)
-        if a.x < b.x then
-            return true
-        elseif a.x == b.x then
-            return a.y < b.y
-        else
-            return false
-        end
-    end)
-    if #points < 3 then return end
-    local hull, left_most, p, q = {}, 1, 1, 0
-    while true do
-        table.insert(hull, points[p])
-        q = (p % #points) + 1
-        for i=1, #points do
-            if orient(points[p], points[i], points[q]) then q = i end
-        end
-        p = q
-        if p == left_most then break end
-    end
-    return create_shape_from_vertices(hull), hull
+
+--! CONVEX HULL (GRAHAM SCAN)
+-- https://www.codingdrills.com/tutorial/introduction-to-divide-and-conquer-algorithms/convex-hull-graham-scan
+
+-- Function to calculate the squared distance between two points
+function squared_distance(p1, p2)
+    return (p1.x - p2.x)^2 + (p1.y - p2.y)^2
 end
 
 
--- SHAPE CREATION
+-- Function to find the orientation of ordered triplet (p, q, r).
+-- The function returns the following values:
+-- 0 : Collinear points
+-- 1 : Clockwise points
+-- 2 : Counterclockwise  
+function orientation(p, q, r, model)
+    -- print the vectors and val
+    -- print_vertices({p, q, r}, "Orientation", model)
+    local val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
+    -- print(val, "Orientation", model)
+    if val == 0 then return 0  -- Collinear
+    elseif val > 0 then return 2  -- Counterclockwise
+    else return 1  -- Clockwise
+    end
+end
+
+
+-- Function to compare two points with respect to a given 'lowest' point
+-- Closure over the lowest point to create a compare function
+function create_compare_function(lowest, model)
+    return function(p1, p2) -- anonymous function
+
+        -- Determine the orientation of the triplet (lowest, p1, p2)
+        local o = orientation(lowest, p1, p2, model)
+
+        -- If p1 and p2 are collinear with lowest, choose the farther one to lowest
+        if o == 0 then
+            return squared_distance(lowest, p1) < squared_distance(lowest, p2)
+        end
+
+        -- For non-collinear points, choose the one that forms a counterclockwise turn with lowest
+        return o == 2
+    end
+end
+
+
+-- O(nlog(n))
+function convex_hull(points, model)
+    local n = #points
+    if n < 3 then return {} end  -- Less than 3 points cannot form a convex hull
+
+    -- Find the point with the lowest y-coordinate (or leftmost in case of a tie)
+    local lowest = 1
+    for i = 2, n do
+        if points[i].y < points[lowest].y or (points[i].y == points[lowest].y and points[i].x < points[lowest].x) then
+            lowest = i
+        end
+    end
+
+    -- Swap the lowest point to the start of the array
+    points[1], points[lowest] = points[lowest], points[1]
+
+    -- Sort the rest of the points based on their polar angle with the lowest point
+    local compare = create_compare_function(points[1], model) -- closure over the lowest point
+    table.sort(points, compare)
+
+    -- Sorted points are necessary but not sufficient to form a convex hull.
+    --! The stack is used to maintain the vertices of the convex hull in construction.
+
+    -- Initializing stack with the first three sorted points
+    -- These form the starting basis of the convex hull.
+    local stack = {points[1], points[2], points[3]}
+
+    -- Process the remaining points to build the convex hull
+    for i = 4, n do
+        -- Check if adding the new point maintains the convex shape.
+        -- Remove points from the stack if they create a 'right turn'.
+        -- This ensures only convex shapes are formed.
+        while #stack > 1 and orientation(stack[#stack - 1], stack[#stack], points[i]) ~= 2 do
+            table.remove(stack)  -- Remove point from stack if it creates a non-convex turn
+        end
+        table.insert(stack, points[i])  -- Add the new point to the stack
+    end
+
+    -- The stack now contains the vertices of the convex hull in counterclockwise order.
+    return create_shape_from_vertices(stack, model), stack
+end
+
+
+--! SHAPE CREATION
 function create_shape_from_vertices(v, model)
     local shape = {type="curve", closed=true;}
     for i=1, #v-1 do 
@@ -214,17 +266,17 @@ end
 
 --! Run the Ipelet
 function run(model)
-    if not get_two_polygons_selection(model) then return end
     local primary, secondary = get_two_polygons_selection(model)
+    if not primary or not secondary then return end
     
     --! Compute the Minkowski sum of the two polygons and store resulting vertices
     local result_vertices = minkowski(primary, secondary, model)
     local centered_result_vertices = center_minkowski_sum(primary, secondary, result_vertices, model)
 
     --! Center the Minkowski sum around the two input shapes
-    local result_shape_obj, _ = convex_hull(result_vertices)
-    local centered_shape_obj, _ = convex_hull(centered_result_vertices)
+    local result_shape_obj, _ = convex_hull(result_vertices, model)
+    local centered_shape_obj, _ = convex_hull(centered_result_vertices, model)
 
-    model:creation("Create Minkowski Sum", ipe.Path(model.attributes, { result_shape_obj }))
+    -- model:creation("Create Minkowski Sum", ipe.Path(model.attributes, { result_shape_obj }))
     model:creation("Create Centered Minkowski Sum", ipe.Path(model.attributes, { centered_shape_obj }))
 end
