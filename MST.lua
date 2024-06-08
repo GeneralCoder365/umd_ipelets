@@ -1,36 +1,6 @@
 label = "PrimModularMST"
 about = "Computes the Minimum Spanning Tree (MST) using Prim's algorithm with modular distance functions on a set of selected points within a shape"
 
---! PRINT FUNCTIONS
-function print_vertices(vertices, title, model)
-    local msg = title ..  ": "
-    for _, vertex in ipairs(vertices) do
-        msg = msg .. ": " .. string.format("Vertex: (%f, %f), ", vertex.x, vertex.y)
-    end
-    model:warning(msg)
-end
-
-function print_table(t, title, model)
-    -- Print lua table
-    local msg = title ..  ": "
-    for k, v in pairs(t) do
-        msg = msg .. k .. " = " .. v .. ", "
-    end
-    model:warning(msg)
-end
-
-function print_vertex(v, title, model)
-    local msg = title
-    msg = msg .. ": " .. string.format("(%f, %f), ", v.x, v.y)
-    model:warning(msg)
-end
-
-function print(x, title, model)
-    local msg = title .. ": " .. x
-    model:warning(msg)
-end
-
-
 --! DISTANCE FUNCTIONS
 
 --! Euclidean Distance (2 points)
@@ -132,16 +102,14 @@ function forwardFunkDistance(model, shape_vertices, B, C)
     if forwardFunkDist1 > 0 then return forwardFunkDist1 else return forwardFunkDist2 end
 end
 
---! MINIMUM FUNK DISTANCE
--- d_{F_{{min}_\Omega}} (B, C) = {min}(d_{F_\Omega} (B, C), d_{F_\Omega} (C, B))
+--! MAXIMUM FUNK DISTANCE
+-- d_{F_{{max}_\Omega}} (B, C) = {max}(d_{F_\Omega} (B, C), d_{F_\Omega} (C, B))
 -- necessary since Funk is inherently directional
-function minimumFunkDistance(model, shape_vertices, B, C)
+function maxFunkDistance(model, shape_vertices, B, C)
     local forwardFunkDist = forwardFunkDistance(model, shape_vertices, B, C)
     local reverseFunkDist = reverseFunkDistance(model, shape_vertices, B, C)
 
-    -- print forward and reverse funk distances
-
-    return math.min(forwardFunkDist, reverseFunkDist)
+    return math.max(forwardFunkDist, reverseFunkDist)
 end
 
 
@@ -222,7 +190,6 @@ function primMST(points, shape_vertices, distance_func, model)
                 end
 
                 local weight = distance(distance_func, model, shape_vertices, pointU, pointV)
-                -- print(weight, "Weight", model)
                 
                 -- weight > 0 ensures that the distance is not 0, i.e. the vertices are not the same
                 if weight > 0 and not mstSet[v] and key[v] > weight then
@@ -417,14 +384,10 @@ function runWithDistanceFunc(model, distFunc)
     if not getSelectedPoints(model) then return end
     local points = getSelectedPoints(model)
 
-    -- print_vertices(points, "Selected points", model)
-
 
     -- Compute the MST
     local mst = primMST(points, {}, distFunc, model)
 
-    -- Print the MST
-    -- print_table(mst, "MST", model)
     
     -- Visualize the MST
     local paths = {}
@@ -444,9 +407,6 @@ function runWithDistanceShape(model, distFunc)
     if not getSelectedPointsAndShape(model) then return end
     local points, shape_vertices = getSelectedPointsAndShape(model)
 
-    -- print_vertices(points, "Selected points", model)
-    -- print_vertices(shape_vertices, "Shape vertices", model)
-
     -- Check if all points are within the shape
     for _, point in ipairs(points) do
         if not isPointInShape(point, shape_vertices) then
@@ -458,9 +418,6 @@ function runWithDistanceShape(model, distFunc)
 
     -- Compute the MST
     local mst = primMST(points, shape_vertices, distFunc, model)
-
-    -- Print the MST
-    -- print_table(mst, "MST", model)
     
     -- Visualize the MST
     local paths = {}
@@ -481,5 +438,5 @@ end
 methods = {
     { label = "MST with Euclidean Distance", run = function(model) runWithDistanceFunc(model, euclideanDistance) end },
     { label = "MST with Hilbert Distance", run = function(model) runWithDistanceShape(model, hilbertDistance) end },
-    { label = "MST with Minimum Funk Distance", run = function(model) runWithDistanceShape(model, minimumFunkDistance) end },
+    { label = "MST with Maximum Funk Distance", run = function(model) runWithDistanceShape(model, maxFunkDistance) end },
 }
