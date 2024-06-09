@@ -3,20 +3,21 @@ UMD_Ipelets
 
 ## Description
 This is a project to assemble Ipelets for many general polygonal operations used by the field of convex geometry.
-To read more please check our [arxiv post](https://arxiv.org/abs/2403.10033) and our [video](https://www.youtube.com/watch?v=bWBh-MkIMe4)! 
+To read more please check our [official publication](https://doi.org/10.4230/LIPIcs.SoCG.2024.92) and our [video](https://www.youtube.com/watch?v=bWBh-MkIMe4)! 
 
 ## Ipelets
 We have several Ipelets available for use they are:
-1. Minkowski Sum
-2. Polar Body
-3. Macbeath Region
-5. Minimum Spanning Tree (minimum Funk, Hilbert, Euclidean)
-6. Minimum Enclosing Ball
+1. Polygon Operations (Union, Intersection, Subtraction)
+2. Minkowski Sum
+3. Minimum Enclosing Ball
+4. Polar Body
+5. Macbeath Region
+6. Funk and Reverse Funk Balls
 7. Hilbert Balls
-8. Funk and Reverse Funk Balls
+8. Minimum Spanning Tree (maximum Funk, Hilbert, Euclidean)
 
 ## Installation
-Download the files, put them in the Ipelets subfolder folder in your Ipe folder.
+Download the files, and put them in the Ipelets subfolder folder in your Ipe folder.
 
 ## Usage
 They should appear under Ipelets.
