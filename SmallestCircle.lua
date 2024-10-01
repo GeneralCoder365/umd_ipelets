@@ -179,3 +179,4 @@ function run(model)
 	generate_smallest_circle(model, extreme1, extreme2, edge_points)
 
 end
+
