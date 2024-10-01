@@ -1,5 +1,5 @@
 -- Define the Ipelet
-label = "Hilbert Ball (EXPERIMENTAL) (MANGO)"
+label = "Hilbert Ball"
 revertOriginal = _G.revertOriginal
 about = "Given a polygon, and its center point, returns the Hilbert ball of the polygon"
 
