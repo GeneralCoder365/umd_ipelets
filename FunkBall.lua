@@ -58,13 +58,23 @@ function create_segments_from_vertices(vertices)
 	return segments, segments_start_finish
 end
 
+function not_in_table(vectors, vector_comp)
+    local flag = true
+    for _, vertex in ipairs(vectors) do
+        if vertex == vector_comp then
+            flag = false
+        end
+    end
+    return flag
+end
+
 function unique_points(points, model)
 	-- Check for duplicate points and remove them
     local uniquePoints = {}
     for i = 1, #points do
         if (not_in_table(uniquePoints, points[i])) then
-					table.insert(uniquePoints, points[i])
-				end
+			table.insert(uniquePoints, points[i])
+		end
     end
     return uniquePoints
 end
@@ -343,6 +353,46 @@ function convex_hull(points, model)
 
 end
 
+function get_overlapping_points(v1, v2)
+	local overlap = {}
+	for i=1, #v1 do
+		if is_in_polygon(v1[i], v2) then
+			table.insert(overlap, v1[i])
+		end
+	end
+	return overlap
+end
+
+function get_intersection_points(s1,s2)
+	local intersections = {}
+	for i=1,#s2 do
+		for j=1,#s1 do
+			local intersection = s2[i]:intersects(s1[j])
+			if intersection then
+				table.insert(intersections, intersection)
+			end
+		end
+	end
+
+	return intersections
+end
+
+function polygon_intersection(v1, s1, v2, s2, model)
+	local intersections = get_intersection_points(s1, s2)
+	local overlap1 = get_overlapping_points(v1, v2)
+	local overlap2 = get_overlapping_points(v2, v1)
+
+	local region = {}
+	for i=1, #intersections do table.insert(region, intersections[i]) end
+	for i=1, #overlap1 do table.insert(region, overlap1[i]) end
+	for i=1, #overlap2 do table.insert(region, overlap2[i]) end
+
+	local shape, _ = convex_hull(region)
+	local region_obj = ipe.Path(model.attributes, { shape })
+
+	return region_obj
+end
+
 function run_forward_spokes(model)
 	if not get_pt_and_polygon_selection(model) then return end
     local center, vertices, _, segments_start_finish = get_pt_and_polygon_selection(model)
@@ -370,27 +420,37 @@ end
 
 function run_reverse_spokes(model)
 	if not get_pt_and_polygon_selection(model) then return end
-    local center, vertices, _, segments_start_finish = get_pt_and_polygon_selection(model)
+    local center, vertices, segments, segments_start_finish = get_pt_and_polygon_selection(model)
     local v_rays = create_rays(vertices, center, model)
     local spokes, vertex_intersect = get_spokes(v_rays, segments_start_finish, model)
 	
     local spoke_obj_list = get_spokes_path_objs(spokes, model)
     local points_on_spokes = get_points_on_spokes_reverse(vertex_intersect, center)
 	local shape, _ = convex_hull(points_on_spokes)
-    table.insert(spoke_obj_list, ipe.Path(model.attributes, { shape }))
-    model:creation("points on spokes", ipe.Group(spoke_obj_list) )
+	local ball_obj = ipe.Path(model.attributes, { shape })
+	table.insert(spoke_obj_list, ball_obj)
+
+	local v,s, _ = get_polygon_vertices_and_segments(ball_obj)
+	local intersect_obj = polygon_intersection(v, s, vertices, segments, model)
+	table.insert(spoke_obj_list, intersect_obj)
+
+    model:creation("spokes and reverse funk ball", ipe.Group(spoke_obj_list) )
 end
 
 function run_reverse_without_spokes(model)
 	if not get_pt_and_polygon_selection(model) then return end
-	local center, vertices, _, segments_start_finish = get_pt_and_polygon_selection(model)
+	local center, vertices, segments, segments_start_finish = get_pt_and_polygon_selection(model)
     local v_rays = create_rays(vertices, center, model)
-    local spokes, vertex_intersect = get_spokes(v_rays, segments_start_finish, model)
+    local _, vertex_intersect = get_spokes(v_rays, segments_start_finish, model)
 	
     local points_on_spokes = get_points_on_spokes_reverse(vertex_intersect, center)
 	local shape, _ = convex_hull(points_on_spokes)
+	local ball_obj = ipe.Path(model.attributes, { shape })
+
+	local v,s, _ = get_polygon_vertices_and_segments(ball_obj)
+	local intersect_obj = polygon_intersection(v, s, vertices, segments, model)
 	
-    model:creation("points on spokes", ipe.Path(model.attributes, { shape }))
+    model:creation("spokes and reverse funk ball", ipe.Group({ball_obj, intersect_obj}) )
 end
 
 methods = {
