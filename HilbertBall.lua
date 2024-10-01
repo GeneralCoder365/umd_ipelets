@@ -1,5 +1,5 @@
 -- Define the Ipelet
-label = "Hilbert Ball"
+label = "Hilbert Ball (EXPERIMENTAL) (MANGO)"
 revertOriginal = _G.revertOriginal
 about = "Given a polygon, and its center point, returns the Hilbert ball of the polygon"
 
@@ -8,6 +8,12 @@ function incorrect(title, model) model:warning(title) end
 function is_convex(vertices)
 	local _, convex_hull_vectors = convex_hull(vertices)
 	return #convex_hull_vectors == #vertices
+end
+
+function not_in_table(vectors, vector_comp)
+    local flag = true
+    for _, vertex in ipairs(vectors) do if vertex == vector_comp then flag = false end end
+    return flag
 end
 
 function is_in_polygon(point, polygon)
@@ -64,8 +70,8 @@ function unique_points(points, model)
     local uniquePoints = {}
     for i = 1, #points do
         if (not_in_table(uniquePoints, points[i])) then
-					table.insert(uniquePoints, points[i])
-				end
+			table.insert(uniquePoints, points[i])
+		end
     end
     return uniquePoints
 end
@@ -163,87 +169,16 @@ function get_spokes_path_objs(spokes, model)
     return spoke_obj_list
 end
 
-function compute_K_constants(a,b,d,R, model)
-    local top_fraction = (b.x-d.x)*(b.x-d.x) + (b.y-d.y)*(b.y-d.y)
-    local bottom_fraction = (b.x-a.x)*(b.x-a.x) + (b.y-a.y)*(b.y-a.y)
-    local square_root_part = math.sqrt(top_fraction/bottom_fraction)
-    local exponent_part = 2*(2*R - math.log(square_root_part))
-    local K1 = math.exp(exponent_part)
-    local K2 = (a.y-d.y) / (a.x-d.x)
-    return K1, K2
-end
+function norm(p1, p2) return math.sqrt( (p1.x-p2.x)^2 + (p1.y-p2.y)^2 ) end
+function get_point(A, C, D, r, model) return (1 / (1 + ( norm(C,D) / norm(A,C) ) * math.exp(2*r))) * (D-A) + A end
 
-function get_point_vertical(a,b,d,R, model) 
-	local K1,_ = compute_K_constants(a,b,d,R, model)
-	local A = 1-K1
-	local B = -2*a.y+2*d.y*K1
-	local C_1 = (a.x*a.x) - 2*(a.x*a.x) - K1*(a.x*a.x) + 2*K1*d.x*a.x
-	local C_2 = K1*((d.x*d.x)+(d.y*d.y))-(a.x*a.x)-(a.y*a.y)
-	local C = C_1 - C_2
-	local x
-	local y
-	local discriminant = (B*B)-4*A*C
-	
-	if d.y > a.y then
-		x = a.x
-		y = (-B + math.sqrt(discriminant)) / (2*A)
-	else
-		x = a.x
-		y = (-B - math.sqrt(discriminant)) / (2*A)
-	end
-	
-	return ipe.Vector(x,y)
-end
-
-function get_point(a,b,d,R, model)
-	local K1,K2 = compute_K_constants(a,b,d,R, model)
-	local A = 1 + (K2*K2) - K1 - K1*(K2*K2)
-	local B = -2*a.x-2*a.x*(K2*K2)+2*a.y*K2-2*a.y*K2+2*K1*d.x+2*K1*a.x*(K2*K2)-2*K1*a.y*K2+2*d.y*K1*K2
-	local C_1 = (a.x*a.x)*(K2*K2)-2*a.x*a.y*K2+(a.y*a.y)-2*a.y*(-K2*a.x+a.y)-K1*((a.x*a.x)*(K2*K2)-2*a.x*a.y*K2+(a.y*a.y))+2*d.y*K1*(-K2*a.x+a.y)
-	local C_2 = K1*((d.x*d.x)+(d.y*d.y))-(a.x*a.x)-(a.y*a.y)
-	local C = C_1 - C_2
-
-	local discriminant = (B*B)-4*A*C
-	local x_1 = (-B + math.sqrt(discriminant)) / (2*A)
-	local y_1 = K2*(x_1-a.x)+a.y
-
-	local x_2 = (-B - math.sqrt(discriminant)) / (2*A)
-	local y_2 = K2*(x_2-a.x)+a.y
-
-	return ipe.Vector(x_1,y_1), ipe.Vector(x_2, y_2)
-end
- 
-function get_points_on_spokes(vertex_intersect, center, radius, polygon, model)
-	
+function get_points_on_spokes(vertex_intersect, center, radius, model)
     local points_on_spokes = {}
-
     for i=1, #vertex_intersect do
-
 		local vertex = ipe.Vector(vertex_intersect[i][1], vertex_intersect[i][2])
 		local intersect = ipe.Vector(vertex_intersect[i][3], vertex_intersect[i][4])
-
-		if intersect.x == vertex.x then
-			local point1 = get_point_vertical(vertex, center, intersect, radius, model)
-			local point2 = get_point_vertical(intersect, center, vertex, radius, model)
-			table.insert(points_on_spokes, point1)
-			table.insert(points_on_spokes, point2)
-		else
-			local point1, point2 = get_point(vertex, center, intersect, radius, model)
-			local point3, point4 = get_point(intersect, center, vertex, radius, model)
-			
-			if vertex.x < intersect.x  then
-				table.insert(points_on_spokes, point1)
-			else
-				table.insert(points_on_spokes, point2)
-			end
-			if intersect.x < vertex.x then
-				table.insert(points_on_spokes, point3)
-			else
-				table.insert(points_on_spokes, point4)
-			end
-		end
-		
-
+        table.insert(points_on_spokes, get_point(vertex, center, intersect, radius, model))
+        table.insert(points_on_spokes, get_point(intersect, center, vertex, radius, model))
     end
     return points_on_spokes
 end
