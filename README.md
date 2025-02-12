@@ -1,4 +1,4 @@
-# Ipelets for Convex Polygonal Geometry
+# Ipelets for the Convex Polygonal Geometry
 
 This repository contains a collection of **Ipelets** designed for various computational operations in **convex polygonal geometry**. These tools facilitate key operations used in the field, making it easier to manipulate and analyze convex polygons.
 
