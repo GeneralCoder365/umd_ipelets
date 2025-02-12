@@ -1,5 +1,4 @@
-## Name
-UMD_Ipelets
+# Ipelets for Convex Polygonal Geometry
 
 ## Description
 This is a project to assemble Ipelets for many general polygonal operations used by the field of convex geometry.
