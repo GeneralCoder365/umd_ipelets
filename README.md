@@ -17,8 +17,15 @@ This project provides the following Ipelets:
 
 ## 🚀 Installation
 To install the Ipelets:
-1. **Download** the repository's files.
-2. **Move** the files into the `/ipelets` subdirectory inside your existing **Ipe** installation.
+
+1. **Download the latest Ipelets package**:
+   - Go to the **[Releases page](https://github.com/umd_ipelets/releases)**.
+   - Download the latest `ipelets.zip`.
+   - Extract the `.zip` file.
+
+2. **Move the `.lua` files**:
+   - Copy all extracted `.lua` files from the `/ipelets` folder.
+   - Paste them into the `/ipelets` subdirectory of your Ipe installation.
 
 Once added, they will automatically appear in the **Ipelets** menu within Ipe.
 
