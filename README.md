@@ -1,43 +1,48 @@
 # Ipelets for Convex Polygonal Geometry
 
-## Description
-This is a project to assemble Ipelets for many general polygonal operations used by the field of convex geometry.
-To read more please check our [official publication](https://doi.org/10.4230/LIPIcs.SoCG.2024.92) and our [video](https://www.youtube.com/watch?v=bWBh-MkIMe4)! 
+This repository contains a collection of **Ipelets** designed for various computational operations in **convex polygonal geometry**. These tools facilitate key operations used in the field, making it easier to manipulate and analyze convex polygons.
 
-## Ipelets
-We have several Ipelets available for use they are:
-1. Polygon Operations (Union, Intersection, Subtraction)
-2. Minkowski Sum
-3. Minimum Enclosing Ball
-4. Polar Body
-5. Macbeath Region
-6. Funk and Reverse Funk Balls
-7. Hilbert Balls
-8. Minimum Spanning Tree (maximum Funk, Hilbert, Euclidean)
+For more details, check out our **[official publication](https://doi.org/10.4230/LIPIcs.SoCG.2024.92)** and our **[video demonstration](https://www.youtube.com/watch?v=bWBh-MkIMe4)**!
 
-## Installation
-Download the files, and put them in the Ipelets subfolder folder in your Ipe folder.
+## 📌 Ipelets Available
+This project provides the following Ipelets:
+- **Polygon Operations**: Union, Intersection, and Subtraction
+- **Minkowski Sum**
+- **Minimum Enclosing Ball**
+- **Polar Body**
+- **Macbeath Region**
+- **Funk and Reverse Funk Balls**
+- **Hilbert Balls**
+- **Minimum Spanning Tree** (using Funk, Hilbert, and Euclidean metrics)
 
-## Usage
-They should appear under Ipelets.
+## 🚀 Installation
+To install the Ipelets:
+1. **Download** the repository's files.
+2. **Move** the files into the `/ipelets` subdirectory inside your existing **Ipe** installation.
 
-## Support
-If there are issues email octavo@umd.edu
+Once added, they will automatically appear in the **Ipelets** menu within Ipe.
 
-## Roadmap
-We will continue to put up more Ipelets for basic computational geometry operations in the polygonal goeometry. 
+## ▶️ Usage
+To use the Ipelets:
+- Open **Ipe**.
+- Navigate to the **Ipelets** menu.
+- Select the desired operation.
 
-## Authors and acknowledgment
-Contributors are:
-Nithin Parepally 
-Ainesh Chatterjee
-Sukrit Mangla
-Hongyang Du
-Kenny Wu
-Sarah Hwang
+## 🛠 Support & Project Status
+We are actively maintaining this project and are committed to **fixing bugs and assisting users**. If you encounter any issues, feel free to reach out to **octavo@umd.edu**.
 
-## License
-We are using the MIT License
+While we **may** expand the project by adding more **Ipelets**, this depends on future needs and contributions. Potential updates could include:
+- Additional convex geometry tools.
+- Performance optimizations.
 
-## Project status
-This is an ongoing project
+## 👥 Authors & Contributors
+This project is developed and maintained by:
+- **Nithin Parepally**
+- **Ainesh Chatterjee**
+- **Sukrit Mangla**
+- **Hongyang Du**
+- **Kenny Wu**
+- **Sarah Hwang**
+
+## 📜 License
+This project is licensed under the **MIT License**.
